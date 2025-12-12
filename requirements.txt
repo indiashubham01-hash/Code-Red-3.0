@@ -14,3 +14,4 @@ xgboost
 shap
 transformers
 ollama
+google-generativeai

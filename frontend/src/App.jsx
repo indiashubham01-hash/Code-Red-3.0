@@ -1,17 +1,40 @@
 import React, { useState } from 'react';
-import { Heart, Activity, Wind, Microscope, MessageCircle, Github } from 'lucide-react';
+import { Heart, Activity, Wind, Microscope, MessageCircle, Github, FileText } from 'lucide-react';
+import axios from 'axios';
 import { CardioForm, IPFForm } from './components/Forms';
 import { DiabetesForm, ChatInterface } from './components/Forms2';
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
 
 // Result Display Component
 const ResultCard = ({ result }) => {
   if (!result) return null;
   const { type, data } = result;
+  const [report, setReport] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  // Reset report when result changes
+  React.useEffect(() => { setReport(null); }, [result]);
 
   const getRiskColor = (prob) => {
     if (prob < 0.3) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
     if (prob < 0.7) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     return 'bg-rose-100 text-rose-800 border-rose-200';
+  };
+
+  const generateReport = async () => {
+    setLoadingReport(true);
+    try {
+      const payload = {
+        prediction: data,
+        symptoms: ["No specific symptoms provided by user input form."]
+      };
+      const res = await axios.post(`${API_URL}/generate_report`, payload);
+      setReport(res.data.report);
+    } catch (err) {
+      alert("Failed to generate report: " + err.message);
+    }
+    setLoadingReport(false);
   };
 
   return (
@@ -44,6 +67,27 @@ const ResultCard = ({ result }) => {
           </ul>
         </div>
       )}
+
+      {/* Report Generation Section */}
+      <div className="mt-6 pt-6 border-t border-slate-200">
+        {!report ? (
+          <button
+            onClick={generateReport}
+            disabled={loadingReport}
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
+          >
+            <FileText size={18} />
+            {loadingReport ? "Generating AI Report..." : "Generate Detailed AI Report"}
+          </button>
+        ) : (
+          <div className="animate-fade-in bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <FileText size={16} className="text-brand-500" /> AI Medical Report
+            </h4>
+            {report}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

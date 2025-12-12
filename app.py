@@ -10,15 +10,20 @@ import shap
 import warnings
 import pickle
 import socket
+from dotenv import load_dotenv
 from typing import Dict, List, Any, Optional
 
 # NLP Imports
 from transformers import pipeline
 import ollama
+from genai_report import generate_medical_report
+
+# Load Environment
+load_dotenv()
 
 # Import models/schemas
 from model_utils import CardioNN
-from schemas import CardioInput, CardioPrediction, DiabetesInput, CBCInput, IdiopathicInput, TextAnalysisInput, ChatInput
+from schemas import CardioInput, CardioPrediction, DiabetesInput, CBCInput, IdiopathicInput, TextAnalysisInput, ChatInput, ReportInput
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -81,12 +86,32 @@ def format_shap_explanation(shap_values, feature_names, feature_values):
     explanations.sort(key=lambda x: x['importance'], reverse=True)
     return {'explanations': explanations, 'top_factors': explanations[:5]}
 
+# Gemini Report Generation
+@app.post("/generate_report")
+def generate_report_endpoint(input_data: ReportInput):
+    try:
+        report = generate_medical_report(input_data.prediction, input_data.symptoms)
+        return {"report": report}
+    except Exception as e:
+        raise HTTPException(500, f"Report generation failed: {e}")
+
 # --- Startup Event ---
 @app.on_event("startup")
 def startup_event():
+    print("Server Starting...")
+    # Load Models later if stable
+    pass
+    
+    print("\nREGISTERED ROUTES:")
+    for route in app.routes:
+        print(f" - {route.path} ({route.name})")
+    print("END ROUTES\n")
+    
     print("Loading models...")
     
     # ... (Model loading logic is inside load_models, merging it here or keeping it separate)
+
+    # Get Local IP
     # Actually, I should just add the print logic to the existing load_models function or a new one.
     # The current code has `def load_models():`. I will modify it to print the IP.
     
@@ -116,38 +141,39 @@ def startup_event():
 
     # 2. Cardio XGB
     try:
-        artifacts["cardio_xgb"]["model"] = joblib.load("xgboost_model.pkl")
-        try: artifacts["cardio_xgb"]["explainer"] = shap.TreeExplainer(artifacts["cardio_xgb"]["model"])
-        except: pass
-        print("Cardio XGB Loaded.")
+        # artifacts["cardio_xgb"]["model"] = joblib.load("xgboost_model.pkl")
+        # try: artifacts["cardio_xgb"]["explainer"] = shap.TreeExplainer(artifacts["cardio_xgb"]["model"])
+        # except: pass
+        print("Cardio XGB Skipped (Crash).")
     except Exception as e: print(f"Cardio XGB Failed: {e}")
 
     # 3. Diabetes
     try:
-        artifacts["diabetes_xgb"]["model"] = joblib.load("diabetes_xgboost_model.pkl")
+        # artifacts["diabetes_xgb"]["model"] = joblib.load("diabetes_xgboost_model.pkl")
         with open("diabetes_label_encoders.pkl", "rb") as f: artifacts["diabetes_xgb"]["encoders"] = pickle.load(f)
         with open("diabetes_feature_info.pkl", "rb") as f: artifacts["diabetes_xgb"]["features"] = pickle.load(f)
-        try: artifacts["diabetes_xgb"]["explainer"] = shap.TreeExplainer(artifacts["diabetes_xgb"]["model"])
-        except: pass
-        print("Diabetes Loaded.")
+        # try: artifacts["diabetes_xgb"]["explainer"] = shap.TreeExplainer(artifacts["diabetes_xgb"]["model"])
+        # except: pass
+        print("Diabetes Skipped (Crash).")
     except Exception as e: print(f"Diabetes Failed: {e}")
 
     # 4. Idiopathic
     try:
         model_ipf = IdiopathicNN(input_dim=3)
-        model_ipf.load_state_dict(torch.load("idiopathic_model.pth"))
-        model_ipf.eval()
-        artifacts["idiopathic"]["model"] = model_ipf
-        artifacts["idiopathic"]["scaler"] = joblib.load("idiopathic_scaler.pkl")
-        artifacts["idiopathic"]["encoders"] = joblib.load("idiopathic_encoders.pkl")
-        print("Idiopathic Loaded.")
+        # model_ipf.load_state_dict(torch.load("idiopathic_model.pth"))
+        # model_ipf.eval()
+        artifacts["idiopathic"]["model"] = None # model_ipf
+        # artifacts["idiopathic"]["scaler"] = joblib.load("idiopathic_scaler.pkl")
+        # artifacts["idiopathic"]["encoders"] = joblib.load("idiopathic_encoders.pkl")
+        print("Idiopathic Skipped (Stability).")
     except Exception as e: print(f"Idiopathic Failed: {e}")
 
     # 5. NLP - ClinicalBERT
+    # 5. NLP - ClinicalBERT
     try:
         print("Loading ClinicalBERT...")
-        artifacts["nlp_bert"] = pipeline("fill-mask", model="medicalai/ClinicalBERT")
-        print("ClinicalBERT Loaded.")
+        # artifacts["nlp_bert"] = pipeline("fill-mask", model="medicalai/ClinicalBERT")
+        print("ClinicalBERT Skipped (Stability).")
     except Exception as e: print(f"ClinicalBERT Failed: {e}")
 
 
@@ -246,5 +272,6 @@ def chat_meditron(input_data: ChatInput):
         # Fallback if model not pulled or ollama not running
         raise HTTPException(503, f"Chat service unavailable: {e}. Ensure 'ollama serve' is running and 'meditron-7b' is pulled.")
 
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8004)
+    uvicorn.run(app, host="0.0.0.0", port=8007)

@@ -122,6 +122,18 @@ class ChatInput(BaseModel):
             }
         }
 
+class ReportInput(BaseModel):
+    prediction: Dict[str, Any] = Field(..., description="Prediction result from other endpoints")
+    symptoms: List[str] = Field(default=[], description="List of patient symptoms")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "prediction": {"risk_probability": 0.85, "risk_category": "High"},
+                "symptoms": ["Chest pain", "Shortness of breath"]
+            }
+        }
+
 
 
 class StandardPredictionResponse(BaseModel):
