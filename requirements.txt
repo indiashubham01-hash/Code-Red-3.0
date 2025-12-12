@@ -1,0 +1,16 @@
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+torch
+fastapi
+uvicorn
+python-multipart
+requests
+streamlit
+python-dotenv
+xgboost
+shap
+transformers
+ollama
