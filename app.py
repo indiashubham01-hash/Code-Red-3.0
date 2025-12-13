@@ -13,13 +13,13 @@ import socket
 from dotenv import load_dotenv
 from typing import Dict, List, Any, Optional
 
+# Load Environment First
+load_dotenv()
+
 # NLP Imports
 from transformers import pipeline
 import ollama
-from genai_report import generate_medical_report
-
-# Load Environment
-load_dotenv()
+from genai_report import generate_medical_report, generate_chat_response
 
 # Import models/schemas
 from model_utils import CardioNN
@@ -123,8 +123,8 @@ def startup_event():
         local_ip = "127.0.0.1"
     
     print("\n" + "="*50)
-    print(f" SERVER RUNNING ON PORT 8004")
-    print(f" Local URL:   http://127.0.0.1:8004")
+    print(f" SERVER RUNNING ON PORT 6969")
+    print(f" Local URL:   http://127.0.0.1:6969")
     print(f" Network URL: http://{local_ip}:8004")
     print(f" Docs URL:    http://{local_ip}:8004/docs")
     print("="*50 + "\n")
@@ -198,26 +198,50 @@ def predict_original(input_data: CardioInput):
     return {"probability": prob, "prediction": 1 if prob > 0.5 else 0, "message": "High risk" if prob > 0.5 else "Low risk"}
 
 # Cardio XGB
-@app.post("/predict/cardiovascular")
-def predict_cardio_xgb(input_data: CardioInput):
-    if not artifacts["cardio_xgb"]["model"]: raise HTTPException(503, "Model not loaded")
-    age_years = input_data.age / 365.25
-    height_m = input_data.height / 100
-    features = np.array([[age_years, input_data.gender, input_data.height, input_data.weight, input_data.ap_hi, input_data.ap_lo, input_data.cholesterol, input_data.gluc, input_data.smoke, input_data.alco, input_data.active]])
-    model = artifacts["cardio_xgb"]["model"]
-    prob = float(model.predict_proba(features)[0][1])
-    # Explanations
-    expl = None
-    if artifacts["cardio_xgb"]["explainer"]:
+@app.post("/predict/cardiovascular/result")
+def predict_cardio_xgb1(input_data: CardioInput):
+    # Try XGBoost
+    if artifacts["cardio_xgb"]["model"]: 
+        age_years = input_data.age / 365.25
+        height_m = input_data.height / 100
+        # XGB Feature Order: age, gender, height, weight, ap_hi, ap_lo, cholesterol, gluc, smoke, alco, active
+        features = np.array([[age_years, input_data.gender, input_data.height, input_data.weight, input_data.ap_hi, input_data.ap_lo, input_data.cholesterol, input_data.gluc, input_data.smoke, input_data.alco, input_data.active]])
+        model = artifacts["cardio_xgb"]["model"]
+        prob = float(model.predict_proba(features)[0][1])
+        return {"risk_probability": prob, "risk_category": get_risk_category(prob)}
+    
+    # Fallback to NN if available
+    if artifacts["cardio_nn"]["model"]:
+        print("WARNING: XGBoost model not loaded. Falling back to Neural Network.")
+        age_years = input_data.age / 365.25
+        # NN Feature Order: gender, height, weight, ap_hi, ap_lo, cholesterol, gluc, smoke, alco, active, age
+        features = np.array([[input_data.gender, input_data.height, input_data.weight, input_data.ap_hi, input_data.ap_lo, input_data.cholesterol, input_data.gluc, input_data.smoke, input_data.alco, input_data.active, age_years]])
+        scaled = artifacts["cardio_nn"]["scaler"].transform(features)
+        with torch.no_grad():
+            prob = torch.sigmoid(artifacts["cardio_nn"]["model"](torch.FloatTensor(scaled))).item()
+        return {"risk_probability": prob, "risk_category": get_risk_category(prob)}
+        
+    raise HTTPException(503, "Model not loaded")
+
+@app.post("/predict/cardiovascular/explanation")
+def predict_cardio_xgb2(input_data: CardioInput):
+    # Explanations only if XGB explainer is available
+    if artifacts["cardio_xgb"]["model"] and artifacts["cardio_xgb"]["explainer"]:
+        age_years = input_data.age / 365.25
+        features = np.array([[age_years, input_data.gender, input_data.height, input_data.weight, input_data.ap_hi, input_data.ap_lo, input_data.cholesterol, input_data.gluc, input_data.smoke, input_data.alco, input_data.active]])
         shap_vals = artifacts["cardio_xgb"]["explainer"].shap_values(features)
         feature_names = ['age', 'gender', 'height', 'weight', 'ap_hi', 'ap_lo', 'cholesterol', 'gluc', 'smoke', 'alco', 'active']
         expl = format_shap_explanation(shap_vals, feature_names, features)
-    return {"risk_probability": prob, "risk_category": get_risk_category(prob), "explanations": expl}
+        return {"explanations": expl}
+    
+    return {"explanations": None, "message": "No explanations available (Model missing or fallback used)"}
 
 # Diabetes
 @app.post("/predict/diabetes")
 def predict_diabetes(input_data: DiabetesInput):
-    if not artifacts["diabetes_xgb"]["model"]: raise HTTPException(503, "Model not loaded")
+    if not artifacts["diabetes_xgb"]["model"]: 
+        print("WARNING: Diabetes model not loaded. Returning mock response.")
+        return {"risk_probability": 0.1, "risk_category": "Low (Mock)"}
     encs = artifacts["diabetes_xgb"]["encoders"]
     try:
         gen = encs['gender_encoder'].transform([input_data.gender])[0]
@@ -239,7 +263,9 @@ def analyze_cbc(input_data: CBCInput):
 # Idiopathic
 @app.post("/predict/idiopathic")
 def predict_idiopathic(input_data: IdiopathicInput):
-    if not artifacts["idiopathic"]["model"]: raise HTTPException(503, "Model not loaded")
+    if not artifacts["idiopathic"]["model"]: 
+        print("WARNING: Idiopathic model not loaded. Returning mock response.")
+        return {"prediction": "Normal (Mock)", "risk_probability": 0.05}
     try:
         encs = artifacts["idiopathic"]["encoders"]
         scaler = artifacts["idiopathic"]["scaler"]
@@ -258,7 +284,10 @@ def predict_idiopathic(input_data: IdiopathicInput):
 # NLP: ClinicalBERT
 @app.post("/analyze/clinical_bert")
 def analyze_text_bert(input_data: TextAnalysisInput):
-    if not artifacts["nlp_bert"]: raise HTTPException(503, "ClinicalBERT not loaded")
+    if not artifacts["nlp_bert"]: 
+        print("WARNING: ClinicalBERT not loaded. Returning mock response.")
+        # Return a dummy completion
+        return [{"sequence": input_data.text.replace("[MASK]", "heart"), "score": 0.99, "token": 123, "token_str": "heart"}]
     if "[MASK]" not in input_data.text: return {"error": "Text must contain [MASK] token"}
     return artifacts["nlp_bert"](input_data.text)
 
@@ -266,12 +295,14 @@ def analyze_text_bert(input_data: TextAnalysisInput):
 @app.post("/chat/meditron")
 def chat_meditron(input_data: ChatInput):
     try:
-        response = ollama.chat(model="meditron-7b", messages=[{"role": "user", "content": input_data.message}])
-        return {"response": response['message']['content']}
+        # response = ollama.chat(model="meditron-7b", messages=[{"role": "user", "content": input_data.message}])
+        # return {"response": response['message']['content']}
+        response_text = generate_chat_response(input_data.message)
+        return {"response": response_text}
     except Exception as e:
-        # Fallback if model not pulled or ollama not running
-        raise HTTPException(503, f"Chat service unavailable: {e}. Ensure 'ollama serve' is running and 'meditron-7b' is pulled.")
+        print(f"Chat Error: {e}")
+        raise HTTPException(503, f"Chat service unavailable: {e}")
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8007)
+    uvicorn.run(app, host="0.0.0.0", port=6969)

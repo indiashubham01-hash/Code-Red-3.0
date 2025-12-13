@@ -1,7 +1,7 @@
 import requests
 import json
 
-url = "http://127.0.0.1:8007/generate_report"
+url = "http://127.0.0.1:6969/generate_report"
 
 payload = {
     "prediction": {

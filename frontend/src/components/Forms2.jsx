@@ -4,26 +4,98 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
 
+import { InputGroup, SelectGroup } from './Forms';
+import { User, Cigarette, Heart, Scale, Thermometer, Microscope } from 'lucide-react';
+
 // --- Diabetes Form ---
 export const DiabetesForm = ({ setResult }) => {
-    // Simplified for brevity, usually has more fields
-    const [data, setData] = useState({ age: 45, gender: 'Male', bmi: 25.0, HbA1c_level: 5.5, blood_glucose_level: 100, smoking_history: 'never', hypertension: 0, heart_disease: 0 });
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        age: 45, gender: 'Male', hypertension: 0, heart_disease: 0, smoking_history: 'never',
+        bmi: 25.0, HbA1c_level: 5.5, blood_glucose_level: 100
+    });
+
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.type === 'number' ? Number(e.target.value) : e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/predict/diabetes`, data);
+            const res = await axios.post(`${API_URL}/predict/diabetes`, formData);
             setResult({ type: 'diabetes', data: res.data });
         } catch (err) { alert(err.message); }
+        setLoading(false);
     };
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in">
-            <div className="grid grid-cols-2 gap-4">
-                <input type="number" placeholder="Glucose" className="input-field" value={data.blood_glucose_level} onChange={e => setData({ ...data, blood_glucose_level: Number(e.target.value) })} />
-                <input type="number" placeholder="HbA1c" className="input-field" value={data.HbA1c_level} onChange={e => setData({ ...data, HbA1c_level: Number(e.target.value) })} />
-                <input type="number" placeholder="BMI" className="input-field" value={data.bmi} onChange={e => setData({ ...data, bmi: Number(e.target.value) })} />
+        <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputGroup label="Age" name="age" type="number" value={formData.age} onChange={handleChange} icon={User} />
+                <SelectGroup label="Gender" name="gender" value={formData.gender} onChange={handleChange} icon={User}
+                    options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]} />
+
+                <SelectGroup label="Hypertension" name="hypertension" value={formData.hypertension} onChange={handleChange} icon={Activity}
+                    options={[{ value: 0, label: 'No' }, { value: 1, label: 'Yes' }]} />
+                <SelectGroup label="Heart Disease" name="heart_disease" value={formData.heart_disease} onChange={handleChange} icon={Heart}
+                    options={[{ value: 0, label: 'No' }, { value: 1, label: 'Yes' }]} />
+
+                <SelectGroup label="Smoking History" name="smoking_history" value={formData.smoking_history} onChange={handleChange} icon={Cigarette}
+                    options={[
+                        { value: 'never', label: 'Never' }, { value: 'current', label: 'Current' },
+                        { value: 'former', label: 'Former' }, { value: 'No Info', label: 'No Info' }
+                    ]} />
+                <InputGroup label="BMI" name="bmi" type="number" step="0.1" value={formData.bmi} onChange={handleChange} icon={Scale} />
+
+                <InputGroup label="HbA1c Level" name="HbA1c_level" type="number" step="0.1" value={formData.HbA1c_level} onChange={handleChange} icon={Thermometer} />
+                <InputGroup label="Blood Glucose" name="blood_glucose_level" type="number" value={formData.blood_glucose_level} onChange={handleChange} icon={Thermometer} />
             </div>
-            <button className="btn-primary bg-emerald-600 hover:bg-emerald-500">Check Diabetes Risk</button>
+            <button type="submit" disabled={loading} className="btn-primary bg-emerald-600 hover:bg-emerald-500">
+                {loading ? "Analyzing..." : "Check Diabetes Risk"}
+            </button>
+        </form>
+    );
+};
+
+// --- CBC Form ---
+export const CBCForm = ({ setResult }) => {
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        sex: 'male', wbc: 8.5, rbc: 4.8, hemoglobin: 14.2, hematocrit: 42, platelets: 280,
+        mcv: 88, mch: 30, mchc: 34, rdw: 12.5
+    });
+
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.type === 'number' ? Number(e.target.value) : e.target.value });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await axios.post(`${API_URL}/analyze_cbc`, formData);
+            setResult({ type: 'cbc', data: res.data });
+        } catch (err) { alert(err.message); }
+        setLoading(false);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} icon={User}
+                    options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} />
+                <InputGroup label="WBC (x10^9/L)" name="wbc" type="number" step="0.1" value={formData.wbc} onChange={handleChange} icon={Microscope} />
+                <InputGroup label="RBC (x10^12/L)" name="rbc" type="number" step="0.1" value={formData.rbc} onChange={handleChange} icon={Microscope} />
+
+                <InputGroup label="Hemoglobin (g/dL)" name="hemoglobin" type="number" step="0.1" value={formData.hemoglobin} onChange={handleChange} icon={Activity} />
+                <InputGroup label="Hematocrit (%)" name="hematocrit" type="number" step="0.1" value={formData.hematocrit} onChange={handleChange} icon={Activity} />
+                <InputGroup label="Platelets (x10^9/L)" name="platelets" type="number" value={formData.platelets} onChange={handleChange} icon={Activity} />
+
+                <InputGroup label="MCV (fL)" name="mcv" type="number" step="0.1" value={formData.mcv} onChange={handleChange} />
+                <InputGroup label="MCH (pg)" name="mch" type="number" step="0.1" value={formData.mch} onChange={handleChange} />
+                <InputGroup label="MCHC (g/dL)" name="mchc" type="number" step="0.1" value={formData.mchc} onChange={handleChange} />
+                <InputGroup label="RDW (%)" name="rdw" type="number" step="0.1" value={formData.rdw} onChange={handleChange} />
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary bg-blue-600 hover:bg-blue-500">
+                {loading ? "Analyzing Blood..." : "Analyze CBC Report"}
+            </button>
         </form>
     );
 };

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Heart, Activity, Wind, Microscope, MessageCircle, Github, FileText } from 'lucide-react';
 import axios from 'axios';
 import { CardioForm, IPFForm } from './components/Forms';
-import { DiabetesForm, ChatInterface } from './components/Forms2';
+import { DiabetesForm, ChatInterface, CBCForm } from './components/Forms2';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:6969';
 
 // Result Display Component
 const ResultCard = ({ result }) => {
@@ -162,7 +162,7 @@ function App() {
                 {activeTab === 'diabetes' && <DiabetesForm setResult={setResult} />}
                 {activeTab === 'ipf' && <IPFForm setResult={setResult} />}
                 {activeTab === 'chat' && <ChatInterface />}
-                {activeTab === 'cbc' && <div className="text-center py-10 text-slate-500">CBC Form Placeholder</div>}
+                {activeTab === 'cbc' && <CBCForm setResult={setResult} />}
               </div>
             </div>
 

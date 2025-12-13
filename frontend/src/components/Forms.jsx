@@ -6,7 +6,8 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
 
 // --- Reusable UI Elements ---
-const InputGroup = ({ label, icon: Icon, ...props }) => (
+// --- Reusable UI Elements ---
+export const InputGroup = ({ label, icon: Icon, ...props }) => (
     <div className="space-y-2">
         <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
             {Icon && <Icon size={16} className="text-brand-500" />}
@@ -16,7 +17,7 @@ const InputGroup = ({ label, icon: Icon, ...props }) => (
     </div>
 );
 
-const SelectGroup = ({ label, icon: Icon, options, ...props }) => (
+export const SelectGroup = ({ label, icon: Icon, options, ...props }) => (
     <div className="space-y-2">
         <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
             {Icon && <Icon size={16} className="text-brand-500" />}
@@ -45,8 +46,20 @@ export const CardioForm = ({ setResult }) => {
         setLoading(true);
         try {
             const payload = { ...formData, age: formData.age * 365 }; // Convert years to days
-            const res = await axios.post(`${API_URL}/predict/cardiovascular`, payload);
-            setResult({ type: 'cardio', data: res.data });
+
+            // 1. Get Prediction Result
+            const res1 = await axios.post(`${API_URL}/predict/cardiovascular/result`, payload);
+            let resultData = res1.data;
+
+            // 2. Get Explanation (Optional)
+            try {
+                const res2 = await axios.post(`${API_URL}/predict/cardiovascular/explanation`, payload);
+                if (res2.data.explanations) {
+                    resultData = { ...resultData, explanations: res2.data.explanations };
+                }
+            } catch (ignore) { console.warn("Explanations skipped"); }
+
+            setResult({ type: 'cardio', data: resultData });
         } catch (err) {
             alert("Error: " + err.message);
         }

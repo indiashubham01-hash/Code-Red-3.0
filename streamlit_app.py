@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 # Load Environment Variables
 load_dotenv()
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8004")
+API_URL = os.getenv("API_URL", "http://127.0.0.1:6969")
 
 # Set Page Config
 st.set_page_config(page_title="MedAssist AI Dashboard", layout="wide", page_icon="🏥")
@@ -70,14 +70,15 @@ with tabs[0]:
 
     if st.button("Predict Cardio Risk", type="primary"):
         # Convert Age to days roughly
-        age_days = age_years * 365
+        age_days = int(age_years * 365.25)
         payload = {
-            "age": int(age_days), "gender": gender, "height": height, "weight": weight,
+            "age": age_days, "gender": gender, "height": height, "weight": weight,
             "ap_hi": ap_hi, "ap_lo": ap_lo, "cholesterol": cholesterol, "gluc": gluc,
             "smoke": smoke, "alco": alco, "active": active
         }
         try:
-            res = requests.post(f"{API_URL}/predict/cardiovascular", json=payload)
+            # 1. Result
+            res = requests.post(f"{API_URL}/predict/cardiovascular/result", json=payload)
             if res.status_code == 200:
                 data = res.json()
                 st.subheader("Results")
@@ -87,10 +88,28 @@ with tabs[0]:
                 st.progress(prob)
                 st.metric("Risk Probability", f"{prob*100:.1f}%", delta=data.get('risk_category'))
                 
+                # 2. Explanation (Optional)
+                try:
+                    res2 = requests.post(f"{API_URL}/predict/cardiovascular/explanation", json=payload)
+                    if res2.status_code == 200 and res2.json().get('explanations'):
+                        expl_data = res2.json()['explanations']
+                        st.write("### Top Risk Factors")
+                        if 'top_factors' in expl_data:
+                            for factor in expl_data['top_factors']:
+                                st.info(f"**{factor['feature']}**: {factor['impact']} risk")
                 if 'explanations' in data and data['explanations']:
                     st.write("### Top Risk Factors")
                     for factor in data['explanations']['explanations'][:3]:
-                        st.info(f"**{factor['feature']}**: {factor['impact']} risk (Importance: {factor['importance']:.4f})")
+                        st.info(f"**{factor['feature']}**: {factor['impact']} risk")
+                
+                # Report Generation
+                if st.button("Generate Detailed AI Report", key="rep_cardio"):
+                    with st.spinner("Generating Report..."):
+                         rep = requests.post(f"{API_URL}/generate_report", json={"prediction": data, "symptoms": []})
+                         if rep.status_code == 200:
+                             st.markdown(f"### 📄 AI Medical Report\n{rep.json()['report']}")
+                         else: st.error("Report generation failed.")
+
             else:
                 st.error(f"Error: {res.text}")
         except Exception as e:
@@ -122,6 +141,11 @@ with tabs[1]:
                 data = res.json()
                 st.metric("Diabetes Risk", f"{data['risk_probability']*100:.1f}%", data['risk_category'])
                 st.progress(data['risk_probability'])
+                
+                if st.button("Generate Detailed AI Report", key="rep_diabetes"):
+                     with st.spinner("Generating..."):
+                         rep = requests.post(f"{API_URL}/generate_report", json={"prediction": data, "symptoms": []})
+                         if rep.status_code == 200: st.markdown(f"### 📄 AI Medical Report\n{rep.json()['report']}")
             else: st.error(res.text)
         except Exception as e: st.error(e)
 
@@ -146,30 +170,44 @@ with tabs[2]:
                     st.warning("High likelihood of Idiopathic Pulmonary Fibrosis.")
                 else:
                     st.success("Normal profile.")
+                
+                if st.button("Generate Detailed AI Report", key="rep_ipf"):
+                     with st.spinner("Generating..."):
+                         rep = requests.post(f"{API_URL}/generate_report", json={"prediction": data, "symptoms": []})
+                         if rep.status_code == 200: st.markdown(f"### 📄 AI Medical Report\n{rep.json()['report']}")
             else: st.error(res.text)
         except Exception as e: st.error(e)
 
 # --- 4. CBC ---
 with tabs[3]:
     st.header("CBC Blood Work Analysis")
-    cbc_sex = st.selectbox("Sex", ["male", "female"], key="cbc_sex")
-    c_wbc = st.number_input("WBC (x10^9/L)", 0.0, 50.0, 8.5)
-    c_rbc = st.number_input("RBC", 0.0, 10.0, 4.8)
-    c_hb = st.number_input("Hemoglobin", 0.0, 25.0, 14.0)
-    c_hct = st.number_input("Hematocrit (%)", 0.0, 100.0, 42.0)
-    c_plt = st.number_input("Platelets", 0.0, 1000.0, 250.0)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        cbc_sex = st.selectbox("Sex", ["male", "female"], key="cbc_sex")
+        c_wbc = st.number_input("WBC (x10^9/L)", 0.0, 50.0, 8.5)
+        c_rbc = st.number_input("RBC (x10^12/L)", 0.0, 10.0, 4.8)
+        c_hb = st.number_input("Hemoglobin (g/dL)", 0.0, 25.0, 14.0)
+        c_hct = st.number_input("Hematocrit (%)", 0.0, 100.0, 42.0)
+    with col_b:
+        c_plt = st.number_input("Platelets (x10^9/L)", 0.0, 1000.0, 250.0)
+        c_mcv = st.number_input("MCV (fL)", 50.0, 120.0, 88.0)
+        c_mch = st.number_input("MCH (pg)", 15.0, 40.0, 30.0)
+        c_mchc = st.number_input("MCHC (g/dL)", 20.0, 40.0, 34.0)
+        c_rdw = st.number_input("RDW (%)", 0.0, 30.0, 12.5)
 
     if st.button("Analyze Report"):
         payload = {
             "sex": cbc_sex, "wbc": c_wbc, "rbc": c_rbc, "hemoglobin": c_hb,
-            "hematocrit": c_hct, "platelets": c_plt
+            "hematocrit": c_hct, "platelets": c_plt,
+            "mcv": c_mcv, "mch": c_mch, "mchc": c_mchc, "rdw": c_rdw
         }
         try:
             res = requests.post(f"{API_URL}/analyze_cbc", json=payload)
             if res.status_code == 200:
                 data = res.json()
-                st.write(f"**Summary**: {data['summary']}")
-                st.json(data['findings'])
+                st.write(f"**Summary**: {data.get('summary', 'Analysis Complete')}")
+                if 'findings' in data:
+                    st.json(data['findings'])
             else: st.error(res.text)
         except Exception as e: st.error(e)
 
@@ -180,15 +218,15 @@ with tabs[4]:
     mode = st.radio("Mode", ["Medical Chat", "Text Analysis (ClinicalBERT)"])
     
     if mode == "Medical Chat":
-        st.info("Powered by Meditron-7b via Ollama")
+        st.info("Powered by Gemini API")
         user_input = st.text_input("Ask a medical question:")
         if st.button("Send"):
             try:
-                with st.spinner("Thinking..."):
+                with st.spinner("Gemini Thinking..."):
                     res = requests.post(f"{API_URL}/chat/meditron", json={"message": user_input, "history": []})
                     if res.status_code == 200:
                         st.markdown(f"**AI**: {res.json()['response']}")
-                    else: st.error("Chat service unavailable. Ensure backend has Ollama running.")
+                    else: st.error("Chat service unavailable.")
             except Exception as e: st.error(e)
 
     else:

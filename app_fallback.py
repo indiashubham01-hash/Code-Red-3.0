@@ -54,6 +54,6 @@ class FallbackHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 if __name__ == "__main__":
-    print("Fallback Server Clean Launch on 8005...", flush=True)
-    server = HTTPServer(('0.0.0.0', 8005), FallbackHandler)
+    print("Fallback Server Clean Launch on 6969...", flush=True)
+    server = HTTPServer(('0.0.0.0', 6969), FallbackHandler)
     server.serve_forever()

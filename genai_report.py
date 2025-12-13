@@ -1,60 +1,50 @@
 import os
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Fetch Key from Environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if GEMINI_API_KEY and genai:
-    # Warning: Using a dummy key "dummy_key_12345" will cause API calls to fail if not replaced with a real key.
-    # The user asked for a dummy key, so we proceed, but real generation requires a valid key.
-    genai.configure(api_key=GEMINI_API_KEY)
-
-def generate_medical_report(prediction_data, symptoms):
+def call_gemini(prompt):
     """
-    Generates a medical report using Gemini based on prediction data and symptoms.
+    Calls the Gemini API using the official google-genai SDK.
     """
-    if genai is None or not GEMINI_API_KEY or "dummy" in GEMINI_API_KEY:
-        # Mock response for dummy key to ensure "presentable report" without crashing
-        return f"""
-        **Medical Analysis Report**
-        
-        **Summary of Findings:**
-        Based on the provided data ({prediction_data.get('risk_category', 'Analysis')}), there are indicators that suggest attention is needed. The AI model estimates a risk probability of {prediction_data.get('risk_probability', 0)*100:.1f}%.
-        
-        **Symptoms Noted:**
-        {', '.join(symptoms) if symptoms else 'None reported'}
-        
-        **Recommendations:**
-        1. Consult a healthcare provider for a comprehensive evaluation.
-        2. Monitor lifestyle factors such as diet and exercise.
-        3. Regular check-ups are advised.
-        
-        *Disclaimer: This report is a simulation (Dummy API Key).*
-        """
-
-    model = genai.GenerativeModel('gemini-pro')
-    
-    prompt = f"""
-    You are a medical AI assistant. Generate a professional, empathetic, and concise medical report for a patient based on the following analysis.
-    
-    Patient Data: {prediction_data}
-    Reported Symptoms: {symptoms}
-    
-    The report should include:
-    1. Summary of Findings
-    2. Potential Causes (based on data)
-    3. Recommended Next Steps (Lifestyle, Tests, Doctor Visit)
-    
-    Disclaimer: This is AI-generated and not a substitute for professional medical advice.
-    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "Error: GEMINI_API_KEY not found. Ensure load_dotenv() is called."
     
     try:
-        response = model.generate_content(prompt)
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         return response.text
     except Exception as e:
-        return f"Error generating report: {str(e)}"
+        return f"Request Failed: {str(e)}"
+
+def generate_medical_report(prediction, symptoms):
+    prompt = f"""
+    Act as a Board-Certified Cardiologist. Analyze the following patient data for a medical report:
+    
+    Patient Risk Assessment: {prediction}
+    Reported Symptoms: {symptoms}
+    
+    Please structure your response as a formal Medical Analysis Report:
+    1. **Risk Analysis**: Interpret the prediction probability and category.
+    2. **Symptom Correlation**: Explain how the symptoms might relate to the risk.
+    3. **Recommended Actions**: Specific medical tests (e.g., ECG, Lipid Profile), lifestyle modifications.
+    4. **Warning**: Include a standard medical disclaimer.
+    """
+    return call_gemini(prompt)
+
+def generate_chat_response(message):
+    prompt = f"""
+    You are 'MedAssist AI', a helpful medical assistant. 
+    User Question: {message}
+    
+    Answer concisely and helpfully. Always advice consulting a real doctor for serious issues.
+    """
+    return call_gemini(prompt)
