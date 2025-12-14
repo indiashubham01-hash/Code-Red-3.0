@@ -1,5 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # Import StaticFiles
+import os # Ensure os is imported
 import uvicorn
 import torch
 import torch.nn as nn
@@ -18,7 +20,6 @@ load_dotenv()
 
 # NLP Imports
 from transformers import pipeline
-import ollama
 from genai_report import generate_medical_report, generate_chat_response
 
 # Import models/schemas
@@ -28,7 +29,7 @@ from schemas import CardioInput, CardioPrediction, DiabetesInput, CBCInput, Idio
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
-app = FastAPI(title="MedAssist Comprehensive AI API", description="Unified API for Cardiovascular, Diabetes, CBC, IPF, and Medical NLP")
+app = FastAPI(title="FedHealth Comprehensive AI API", description="Unified API for Cardiovascular, Diabetes, CBC, IPF, and Medical NLP")
 
 # Enable CORS
 app.add_middleware(
@@ -38,6 +39,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Exception Handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    print(f"GLOBAL ERROR: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}", "type": str(type(exc))}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"VALIDATION ERROR: {exc}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc), "body": str(exc.body)}
+    )
+
+# --- Serve Static Files (Frontend) ---
+if os.path.exists("frontend/dist"):
+    app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+
+# SPA Catch-all Route (Must be after specific API routes, or at the end generally, but mounting happens early)
+# We will define the catch-all at the very end of the file to capture non-API routes.
+
 
 # --- Model Classes ---
 class IdiopathicNN(nn.Module):
@@ -100,6 +129,7 @@ def generate_report_endpoint(input_data: ReportInput):
 def startup_event():
     print("Server Starting...")
     # Load Models later if stable
+    print("Reloading Application Logic...")
     pass
     
     print("\nREGISTERED ROUTES:")
@@ -303,6 +333,20 @@ def chat_meditron(input_data: ChatInput):
         print(f"Chat Error: {e}")
         raise HTTPException(503, f"Chat service unavailable: {e}")
 
+
+# --- SPA Catch-all Route ---
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    # Check if file exists in frontend/dist (e.g., favicon.ico, manifest.json)
+    potential_file = f"frontend/dist/{full_path}"
+    if os.path.exists(potential_file) and os.path.isfile(potential_file):
+        return Response(content=open(potential_file, "rb").read(), media_type="application/octet-stream")
+
+    # Otherwise serve index.html for SPA routing
+    if os.path.exists("frontend/dist/index.html"):
+        return Response(content=open("frontend/dist/index.html", "r", encoding="utf-8").read(), media_type="text/html")
+    
+    return {"message": "Frontend not built or index.html missing."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=6969)

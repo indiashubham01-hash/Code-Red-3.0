@@ -3,13 +3,13 @@ import { motion } from 'framer-motion';
 import { Activity, Thermometer, User, Cigarette, Scale, Heart } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:6969';
 
 // --- Reusable UI Elements ---
 // --- Reusable UI Elements ---
 export const InputGroup = ({ label, icon: Icon, ...props }) => (
     <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
             {Icon && <Icon size={16} className="text-brand-500" />}
             {label}
         </label>
@@ -19,7 +19,7 @@ export const InputGroup = ({ label, icon: Icon, ...props }) => (
 
 export const SelectGroup = ({ label, icon: Icon, options, ...props }) => (
     <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
             {Icon && <Icon size={16} className="text-brand-500" />}
             {label}
         </label>
@@ -61,7 +61,9 @@ export const CardioForm = ({ setResult }) => {
 
             setResult({ type: 'cardio', data: resultData });
         } catch (err) {
-            alert("Error: " + err.message);
+            console.error("Prediction Error:", err);
+            const msg = err.response?.data?.detail || err.response?.data?.message || err.message;
+            alert("Error: " + (typeof msg === 'object' ? JSON.stringify(msg) : msg));
         }
         setLoading(false);
     };
@@ -107,7 +109,11 @@ export const IPFForm = ({ setResult }) => {
         try {
             const res = await axios.post(`${API_URL}/predict/idiopathic`, formData);
             setResult({ type: 'ipf', data: res.data });
-        } catch (err) { alert(err.message); }
+        } catch (err) {
+            console.error("IPF Error:", err);
+            const msg = err.response?.data?.detail || err.response?.data?.message || err.message;
+            alert("Error: " + (typeof msg === 'object' ? JSON.stringify(msg) : msg));
+        }
         setLoading(false);
     };
 

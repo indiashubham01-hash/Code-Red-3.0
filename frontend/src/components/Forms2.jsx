@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Activity, MessageSquare, FileText, Send } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8004';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:6969';
 
 import { InputGroup, SelectGroup } from './Forms';
 import { User, Cigarette, Heart, Scale, Thermometer, Microscope } from 'lucide-react';
@@ -23,7 +23,11 @@ export const DiabetesForm = ({ setResult }) => {
         try {
             const res = await axios.post(`${API_URL}/predict/diabetes`, formData);
             setResult({ type: 'diabetes', data: res.data });
-        } catch (err) { alert(err.message); }
+        } catch (err) {
+            console.error("Diabetes Error:", err);
+            const msg = err.response?.data?.detail || err.response?.data?.message || err.message;
+            alert("Error: " + (typeof msg === 'object' ? JSON.stringify(msg) : msg));
+        }
         setLoading(false);
     };
 
@@ -72,7 +76,11 @@ export const CBCForm = ({ setResult }) => {
         try {
             const res = await axios.post(`${API_URL}/analyze_cbc`, formData);
             setResult({ type: 'cbc', data: res.data });
-        } catch (err) { alert(err.message); }
+        } catch (err) {
+            console.error("CBC Error:", err);
+            const msg = err.response?.data?.detail || err.response?.data?.message || err.message;
+            alert("Error: " + (typeof msg === 'object' ? JSON.stringify(msg) : msg));
+        }
         setLoading(false);
     };
 
@@ -102,7 +110,7 @@ export const CBCForm = ({ setResult }) => {
 
 // --- Chat Interface ---
 export const ChatInterface = () => {
-    const [msgs, setMsgs] = useState([{ role: 'ai', content: 'Hello! I am Meditron. Ask me any medical question.' }]);
+    const [msgs, setMsgs] = useState([{ role: 'ai', content: 'Hello! I am FedHealth AI. Ask me any medical question.' }]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -122,20 +130,20 @@ export const ChatInterface = () => {
     };
 
     return (
-        <div className="flex flex-col h-[500px] border rounded-2xl bg-white overflow-hidden shadow-sm">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+        <div className="flex flex-col h-[500px] border border-slate-700/50 rounded-2xl bg-slate-900/50 overflow-hidden shadow-inner">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scrollbar-thin">
                 {msgs.map((m, i) => (
                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-brand-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none shadow-sm'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-2xl ${m.role === 'user' ? 'bg-brand-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none shadow-sm'}`}>
                             {m.content}
                         </div>
                     </div>
                 ))}
-                {loading && <div className="text-slate-400 text-sm ml-4">Thinking...</div>}
+                {loading && <div className="text-slate-400 text-sm ml-4 flex items-center gap-2"><div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" /> Thinking...</div>}
             </div>
-            <div className="p-4 bg-white border-t flex gap-2">
-                <input className="input-field" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Type a message..." />
-                <button onClick={send} className="p-3 bg-brand-600 text-white rounded-lg hover:bg-brand-500"><Send size={20} /></button>
+            <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex gap-2">
+                <input className="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl px-4 focus:ring-1 focus:ring-brand-500 outline-none" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Type a message..." />
+                <button onClick={send} className="p-3 bg-brand-600 text-white rounded-xl hover:bg-brand-500 shadow-lg shadow-brand-500/20"><Send size={20} /></button>
             </div>
         </div>
     );
